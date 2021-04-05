@@ -2,6 +2,7 @@
 //
 
 #include <iostream>
+#include <vector>
 #include <windows.h>
 #include <processthreadsapi.h>
 #include <winuser.h>
@@ -31,6 +32,16 @@ void WriteValue(DWORD Addr, T* Value, size_t size)
         VirtualProtectEx(hProc, (void*)Addr, size, PAGE_EXECUTE_READWRITE, &Old);
         WriteProcessMemory(hProc, (void*)Addr, Value, size, nullptr);
         VirtualProtectEx(hProc, (void*)Addr, size, Old, &Old);
+        CloseHandle(hProc);
+    }
+}
+
+void ReadValue(DWORD Addr, void* Buffer, size_t size)
+{
+    if (auto hProc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, GamePID))
+    {
+        ReadProcessMemory(hProc, (void*)Addr, Buffer, size, nullptr);
+        CloseHandle(hProc);
     }
 }
 
@@ -64,6 +75,22 @@ bool LoopHack()
     }
     return true;
 }
+
+int GetPointer(DWORD Addr, std::vector<int> vOffsets)
+{
+    if (!Addr) return FALSE;
+    int pAddr = FALSE;
+    ReadValue(Addr, &pAddr, sizeof(int));
+    for (int i = 0; i < vOffsets.size(); i++)
+    {
+        pAddr += vOffsets[i];
+        if (vOffsets[i] == vOffsets.back())
+            return pAddr;
+        ReadValue(pAddr, &pAddr, sizeof(int));        
+    }
+    return pAddr;
+}
+
 int main()
 {
     while (!GetWindowThreadProcessId(FindWindow(NULL, "Plants vs. Zombies"), &GamePID))
@@ -71,6 +98,7 @@ int main()
         Sleep(1000);
         std::cout << "Game não encontrado!" << std::endl;
     }
+
     std::cout << ">>>> Game encontrado! <<<<" << std::endl;
     MainHack();
     while (LoopHack())Sleep(100);    
